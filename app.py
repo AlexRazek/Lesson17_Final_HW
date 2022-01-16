@@ -33,18 +33,42 @@ class MovieSchema(Schema):
     id = fields.Int(dump_only=True)
     title = fields.Str()
     description = fields.Str()
+    director_id = fields.Int()
+    genre_id = fields.Int()
+
 
 movie_schema = MovieSchema()
 movies_schema = MovieSchema(many=True)
 
 
-# получаем все фильмы
+# получаем все фильмы класса Movie
 
 @movie_ns.route('/')
 class MovieView(Resource):
     def get(self):
         all_movies = Movie.query.all()
         return movies_schema.dump(all_movies)
+    def post(self):
+        req_json = request.json
+        new_movie = Movie(**req_json)
+        with db.session.begin():
+            db.session.add(new_movie)
+        return "", 201
+
+
+@movie_ns.route('/')
+class MovieView(Resource):
+    def get(self):
+        director_id = request.args.get('director_id')
+        genre_id = request.args.get('genre_id')
+        res = Movie.query
+        if director_id is not None:
+            res = res.filter(Movie.director_id == director_id)
+        if genre_id is not None:
+            res = res.filter(Movie.genre_id == genre_id)
+        result = res.all()
+
+        return movies_schema.dump(result)
 
 # получаем фильм по id
 
@@ -54,6 +78,30 @@ class MovieView(Resource):
         movie = Movie.query.get(id)
         return movie_schema.dump(movie), 200
 
+    def delete(self, id : int):
+        movie = Movie.query.get(id)
+        if not movie:
+            return "", 404
+        db.session.delete(movie)
+        db.session.commit()
+        return "", 204
+
+@movie_ns.route('/<int:id>')
+class MovieView(Resource):
+    def get(self, id):
+        movie = Movie.query.get(id)
+        return movie_schema.dump(movie), 200
+
+    def delete(self, id : int):
+        movie = Movie.query.get(id)
+        if not movie:
+            return "", 404
+        db.session.delete(movie)
+        db.session.commit()
+        return "", 204
+
+
+# Касательно директор
 
 class Director(db.Model):
     __tablename__ = 'director'
@@ -63,6 +111,36 @@ class Director(db.Model):
 class DirectorSchema(Schema):
     id = fields.Int(dump_only=True)
     name = fields.Str()
+
+director_schema = DirectorSchema()
+directors_schema = DirectorSchema(many=True)
+
+
+@director_ns.route('/')
+class DirectorView(Resource):
+    def get(self):
+        all_directors = Director.query.all()
+        return directors_schema.dump(all_directors)
+    def post(self):
+        req_json = request.json
+        new_director = Director(**req_json)
+        with db.session.begin():
+            db.session.add(new_director)
+        return "", 201
+
+@director_ns.route('/<int:id>')
+class DirectorView(Resource):
+    def get(self, id):
+        director = Director.query.get(id)
+        return director_schema.dump(director), 200
+
+    def delete(self, id : int):
+        director = Director.query.get(id)
+        if not director:
+            return "", 404
+        db.session.delete(director)
+        db.session.commit()
+        return "", 204
 
 
 
@@ -74,7 +152,6 @@ class Genre(db.Model):
 class GenreSchema(Schema):
     id = fields.Int(dump_only=True)
     name = fields.Str()
-
 
 if __name__ == '__main__':
     app.run(debug=True)
